@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <title>Khung trái tim bằng nhiều trái tim nhỏ</title>
+  <style>
+    :root { --size: 360px; --accent: #ff6eb4; }
+
+    html,body{height:100%;margin:0;background:#000;display:flex;align-items:center;justify-content:center;font-family:Arial, sans-serif;color:#fff}
+    .wrap { position:relative; width:var(--size); height:var(--size); display:flex; align-items:center; justify-content:center; }
+
+    /* SVG chứa ảnh được mask thành trái tim */
+    .heart-svg { width:100%; height:100%; display:block; position:relative; z-index:2; }
+
+    /* lớp chứa các trái tim nhỏ làm viền */
+    .heart-border {
+      position:absolute;
+      inset:0;
+      z-index:3;
+      pointer-events:none;
+      transform-origin:center;
+      /* không xoay nữa — chỉ đập nhẹ */
+      animation: borderPulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes borderPulse {
+      0%   { transform: scale(1);    opacity: 0.95; filter: blur(0px); }
+      40%  { transform: scale(1.03); opacity: 1;    filter: blur(0.6px); }
+      100% { transform: scale(1);    opacity: 0.95; filter: blur(0px); }
+    }
+
+    .mini-heart {
+      position:absolute;
+      transform-origin:center;
+      font-size:14px;
+      color:var(--accent);
+      text-shadow:0 0 6px rgba(255,110,180,0.6);
+      opacity:0.9;
+      will-change:transform,opacity,left,top;
+      animation: pulseMini 2.2s ease-in-out infinite;
+    }
+
+    /* staggered pulses look nicer */
+    .mini-heart[data-i] { animation-delay: calc(var(--d,0s)); }
+
+    @keyframes pulseMini {
+      0% { transform: scale(.9) translateY(0); opacity:.6; }
+      50% { transform: scale(1.3) translateY(-4px); opacity:1; }
+      100% { transform: scale(.9) translateY(0); opacity:.6; }
+    }
+
+    /* thêm vài trái tim bay ra (tùy chọn) */
+    .floating-heart {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%,-50%);
+      font-size: 20px;
+      color: var(--accent);
+      filter: blur(.5px) drop-shadow(0 0 8px rgba(255,110,180,0.6));
+      animation: floatUp 4s linear infinite;
+      opacity:0;
+      z-index:1;
+    }
+    @keyframes floatUp {
+      0% { transform: translate(-50%,-50%) translateY(0) scale(.6); opacity:0; }
+      10% { opacity:1; }
+      100% { transform: translate(-50%,-50%) translateY(-140px) scale(1.3); opacity:0; }
+    }
+
+    /* tiêu đề neon */
+    h1 { position:absolute; top:-70px; width:100%; text-align:center; font-family:"Brush Script MT",cursive; font-size:42px; color:var(--accent);
+         text-shadow: 0 0 6px var(--accent), 0 0 18px #ff1a8c; margin:0; z-index:4 }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="wrap">
+    <h1>愛してる</h1>
+
+    <!-- SVG dùng để mask ảnh và cung cấp path để lấy điểm -->
+    <svg class="heart-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" id="heartSvg" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <!-- path chuẩn trái tim trong viewBox 0..100 -->
+        <path id="heartPath" d="M50 88.9C25.2 72.5 1 53.5 1 31.4 1 14.6 14.6 1 31.4 1c9.4 0 17.8 4.3 23.6 11C60.8 5.3 69.2 1 78.6 1 95.4 1 99 14.6 99 31.4c0 22.1-24.2 41.1-49 57.5z" />
+        <clipPath id="heartClip">
+          <use href="#heartPath" />
+        </clipPath>
+      </defs>
+
+      <!-- glow layer behind image (blurred) -->
+      <g clip-path="url(#heartClip)">
+        <rect x="0" y="0" width="100" height="100" fill="rgba(255,110,180,0.08)"></rect>
+      </g>
+
+      <!-- image cropped to heart -->
+      <g clip-path="url(#heartClip)">
+        <image href="images/z7012032889446_bc20584db9cfb5db3d8d4142cdf997a6.jpg" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice"></image>
+      </g>
+
+      <!-- optional subtle stroke around heart -->
+      <use href="#heartPath" fill="none" stroke="rgba(255,110,180,0.08)" stroke-width="1.2"></use>
+    </svg>
+
+    <!-- container cho các trái tim nhỏ (dùng absolute positioning) -->
+    <div class="heart-border" id="heartBorder" aria-hidden="true"></div>
+  </div>
+
+  <script>
+    // tạo viền trái tim bằng nhiều emoji nhỏ dọc theo path SVG
+    (function createHeartBorder() {
+      const svg = document.getElementById('heartSvg');
+      const path = document.getElementById('heartPath');
+      const border = document.getElementById('heartBorder');
+      const wrap = document.getElementById('wrap');
+
+      function build() {
+        border.innerHTML = '';
+        const total = 60; // thay đổi số trái tim viền
+        const len = path.getTotalLength();
+        const rect = wrap.getBoundingClientRect();
+        const scaleX = rect.width / 100;
+        const scaleY = rect.height / 100;
+
+        for (let i = 0; i < total; i++) {
+          const t = i / total;
+          const pt = path.getPointAtLength(t * len);
+          // thêm một chút jitter ngẫu nhiên để không quá đều
+          const jitter = (Math.random() - 0.5) * 2.4; // in SVG coords
+          const angle = (Math.random() - 0.5) * 40; // rotate heart slightly
+          const size = 10 + Math.random() * 10; // px
+
+          const el = document.createElement('div');
+          el.className = 'mini-heart';
+          el.textContent = '💗';
+          // convert SVG coords(0..100) => px coordinates inside wrap
+          const left = pt.x * scaleX + jitter * scaleX - size/2;
+          const top  = pt.y * scaleY + jitter * scaleY - size/2;
+
+          el.style.left = left + 'px';
+          el.style.top = top + 'px';
+          el.style.fontSize = size + 'px';
+          el.style.transform = `rotate(${angle}deg)`;
+          // stagger delay to animate nicer
+          const delay = (Math.random() * 1.5).toFixed(2) + 's';
+          el.style.setProperty('--d', delay);
+          el.setAttribute('data-i', i);
+          border.appendChild(el);
+        }
+      }
+
+      // rebuild on load and resize
+      window.addEventListener('load', build);
+      window.addEventListener('resize', () => {
+        // small debounce
+        clearTimeout(window.__hb);
+        window.__hb = setTimeout(build, 120);
+      });
+
+      // optional: spawn a few floating hearts from the bottom of the heart
+      function spawnFloating() {
+        const f = document.createElement('div');
+        f.className = 'floating-heart';
+        f.innerText = Math.random() > 0.6 ? '💖' : '💕';
+        // randomize start position near lower tip of heart
+        const rect = wrap.getBoundingClientRect();
+        const startX = rect.left + rect.width * 0.5 + (Math.random()-0.5)*80;
+        const startY = rect.top + rect.height * 0.78 + (Math.random()-0.15)*30;
+        f.style.left = (startX - rect.left) + 'px';
+        f.style.top  = (startY - rect.top) + 'px';
+        f.style.fontSize = (12 + Math.random()*18) + 'px';
+        document.body.appendChild(f);
+        setTimeout(()=> f.remove(), 4200);
+      }
+      setInterval(spawnFloating, 800);
+    })();
+  </script>
+</body>
+</html>
